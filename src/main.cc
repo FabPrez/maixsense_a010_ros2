@@ -34,6 +34,79 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
     pser = new Serial(s);
     std::cout << "use device: " << s << std::endl;
 
+    // -----
+    // Turn off ISP for raw data
+    // ser << "AT+ISP=0\r";
+    // do {
+    //   ser >> s;
+    //   std::cout << "AT+ISP=0: get dummy: " << s.size() << "\r";
+    // } while(!s.empty());
+    // std::cout << std::endl;
+    // std::cout << "finish: " << "AT+ISP=0" << std::endl;
+
+    // // Set UNIT to 1 (millimeter quantization, 16-bit mode)
+    // ser << "AT+UNIT=1\r";
+    // do {
+    //   ser >> s;
+    //   std::cout << "AT+UNIT=1: get dummy: " << s.size() << "\r";
+    // } while(!s.empty());
+    // std::cout << std::endl;
+    // std::cout << "finish: " << "AT+UNIT=1" << std::endl;
+
+    // // Set full resolution (100x100)
+    // ser << "AT+BINN=1\r";
+    // do {
+    //   ser >> s;
+    //   std::cout << "AT+BINN=1: get dummy: " << s.size() << "\r";
+    // } while(!s.empty());
+    // std::cout << std::endl;
+    // std::cout << "finish: " << "AT+BINN=1" << std::endl;
+
+    // // Enable USB + UART output, disable LCD
+    // ser << "AT+DISP=6\r";
+    // do {
+    //   ser >> s;
+    //   std::cout << "AT+DISP=6: get dummy: " << s.size() << "\r";
+    // } while(!s.empty());
+    // std::cout << std::endl;
+    // std::cout << "finish: " << "AT+DISP=6" << std::endl;
+
+    //  ser << "AT+DISP=1\r";
+    // do {
+    //   ser >> s;
+    //   std::cout << "AT+DISP=1: get dummy: " << s.size() << "\r";
+    // } while(!s.empty());
+    // std::cout << std::endl;
+    // std::cout << "finish: " << "AT+DISP=1" << std::endl;
+
+    // // Set frame rate (e.g., 10 FPS)
+    // ser << "AT+FPS=10\r";
+    // do {
+    //   ser >> s;
+    //   std::cout << "AT+FPS=10: get dummy: " << s.size() << "\r";
+    // } while(!s.empty());
+    // std::cout << std::endl;
+    // std::cout << "finish: " << "AT+FPS=10" << std::endl;
+
+    // // // Save configuration to flash
+    // // ser << "AT+SAVE\r";
+    // // do {
+    // //   ser >> s;
+    // //   std::cout << "AT+SAVE: get dummy: " << s.size() << "\r";
+    // // } while(!s.empty());
+    // // std::cout << std::endl;
+    // // std::cout << "finish: " << "AT+SAVE" << std::endl;
+
+    // // Check if serial port works
+    // ser << "AT\r";
+    // ser >> s;
+    // std::cout << "finish: " << "AT " << s << std::endl;
+    // if (s.compare("OK\r\n")) {
+    //   // not this serial port
+    //   return;
+    // }
+    // -----
+
     ser << "AT+ISP=0\r";
     do {
       ser >> s;
@@ -41,6 +114,15 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
     } while(!s.empty());
     std::cout << std::endl;
     std::cout << "finish: " << "AT+ISP=0" << std::endl;
+
+    // // Set UNIT to 1 (millimeter quantization, 16-bit mode)
+    // ser << "AT+UNIT=0\r";
+    // do {
+    //   ser >> s;
+    //   std::cout << "AT+UNIT=0: get dummy: " << s.size() << "\r";
+    // } while(!s.empty());
+    // std::cout << std::endl;
+    // std::cout << "finish: " << "AT+UNIT=0" << std::endl;
 
     ser << "AT+DISP=1\r";
     do {
@@ -147,7 +229,7 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
 
     std_msgs::msg::Header header;
     header.stamp = this->get_clock()->now();
-    header.frame_id = "tof";
+    header.frame_id = "sensor"; //! Was "tof"
 
     sensor_msgs::msg::Image msg_depth =
         *cv_bridge::CvImage(header, "mono8", md).toImageMsg().get();
@@ -191,9 +273,27 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
     uint8_t *ptr = pcmsg.data.data();
     for (int j = 0; j < pcmsg.height; j++)
       for (int i = 0; i < pcmsg.width; i++) {
+
+        // uint8_t d = depth[j * (pcmsg.width) + i];
+
+        // if (d == 0 || d == 255) {
+        //   *((float *)(ptr + 0)) = NAN;
+        //   *((float *)(ptr + 4)) = NAN;
+        //   *((float *)(ptr + 8)) = NAN;
+        //   *((uint32_t *)(ptr + 12)) = 0;
+        //   ptr += pcmsg.point_step;
+        //   continue;
+        // }
+        
+
+        // with UNIT=0 there is a quantization based on square root and a scaling factor of 5.1
+        // this means that we can measure up to 2.5 m but the resolution is not linear and will get worse with distance
+        // in lower distance we get a good resolution.
+        
         float cx = (((float)i) - u0) / fox;
         float cy = (((float)j) - v0) / foy;
-        float dst = ((float)depth[j * (pcmsg.width) + i]) / 1000;
+        float dst = ((float)depth[j * (pcmsg.width) + i]) ; // was / 1000 in the last part
+        dst = std::pow(dst / 5.1f, 2.0f)/ 1000 ; // compensate for the non-linear depth
         float x = dst * cx;
         float y = dst * cy;
         float z = dst;
