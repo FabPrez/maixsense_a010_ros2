@@ -8,3 +8,13 @@ To enable access to the serial ports used to read data from the sensor, run the 
 sudo chmod 666 /dev/ttyUSB1
 sudo chmod 666 /dev/ttyUSB0
 ```
+
+run it:
+```bash
+ros2 run sipeed_tof_ms_a010 publisher
+```
+
+add sim_time if you are using some kind of simulation
+```bash
+ros2 run sipeed_tof_ms_a010 publisher --ros-args -p use_sim_time:=true
+```
