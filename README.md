@@ -9,12 +9,17 @@ sudo chmod 666 /dev/ttyUSB1
 sudo chmod 666 /dev/ttyUSB0
 ```
 
-run it:
+# Quick Start
+You can launch the publisher node in either simulated or real environment using the sim_environment launch argument.
+
+## Real Environment (default)
 ```bash
-ros2 run sipeed_tof_ms_a010 publisher
+ros2 launch sipeed_tof_ms_a010 run_maixsense.launch.py 
 ```
 
-add sim_time if you are using some kind of simulation
+## Simulated Environment
 ```bash
-ros2 run sipeed_tof_ms_a010 publisher --ros-args -p use_sim_time:=true
+ros2 launch sipeed_tof_ms_a010 run_maixsense.launch.py sim_environment:=true
 ```
+
+The sim_environment flag sets the use_sim_time parameter accordingly for proper integration with simulated ROS time.
