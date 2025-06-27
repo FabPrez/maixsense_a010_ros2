@@ -231,11 +231,11 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
     header.stamp = this->get_clock()->now();
     header.frame_id = "sensor"; //! Was "tof"
 
-    sensor_msgs::msg::Image msg_depth =
-        *cv_bridge::CvImage(header, "mono8", md).toImageMsg().get();
-    RCLCPP_INFO(this->get_logger(), "Publishing: depth:%s",
-                sstream.str().c_str());
-    publisher_depth->publish(msg_depth);
+    // sensor_msgs::msg::Image msg_depth =
+    //     *cv_bridge::CvImage(header, "mono8", md).toImageMsg().get();
+    // RCLCPP_INFO(this->get_logger(), "Publishing: depth:%s",
+    //             sstream.str().c_str());
+    // publisher_depth->publish(msg_depth);
 
     sensor_msgs::msg::PointCloud2 pcmsg;
     pcmsg.header = header;
