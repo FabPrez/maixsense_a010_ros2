@@ -28,7 +28,7 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
  public:
   SipeedTOF_MSA010_Publisher() : Node("sipeed_tof_ms_a010") {
     std::string s;
-    this->declare_parameter("device", "/dev/ttyUSB8");
+    this->declare_parameter("device", "/dev/ttyUSB0");
     rclcpp::Parameter device_param = this->get_parameter("device");
     s = device_param.as_string();
     pser = new Serial(s);
