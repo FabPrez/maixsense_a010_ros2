@@ -1,10 +1,11 @@
+#!/usr/bin/env python3
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    # Dichiarazione degli argomenti
+    # Declaration of arguments
     sim_environment_arg = DeclareLaunchArgument(
         'sim_environment',
         default_value='false',
@@ -17,11 +18,11 @@ def generate_launch_description():
         description='Serial device path'
     )
 
-    # Recupera gli argomenti
+    # Retrieve the arguments
     sim_env = LaunchConfiguration('sim_environment')
     device = LaunchConfiguration('device')
 
-    # Nodo ROS
+    # ROS Node
     publisher_node = Node(
         package='sipeed_tof_ms_a010',
         executable='publisher',
