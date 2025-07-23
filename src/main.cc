@@ -24,6 +24,76 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
  private:
   Serial *pser;
   float uvf_parms[4];
+  
+  bool setup_sensor() {
+    std::string s;
+    try {
+      // Flush buffer con timeout
+      auto start = std::chrono::steady_clock::now();
+      while (true) {
+        ser >> s;
+        if (s.empty()) break;
+        if (std::chrono::steady_clock::now() - start > std::chrono::milliseconds(500)) {
+          RCLCPP_WARN(this->get_logger(), "Timeout while flushing serial buffer");
+          break;
+        }
+      }
+
+      ser << "AT+ISP=0\r";
+      do { ser >> s; } while (!s.empty());
+
+      ser << "AT+DISP=1\r";
+      do { ser >> s; } while (!s.empty());
+
+      ser << "AT+ISP=1\r";
+      do { ser >> s; } while (!s.empty());
+
+      ser << "AT\r";
+      ser >> s;
+      if (s.find("OK") == std::string::npos) {
+        RCLCPP_WARN(this->get_logger(), "AT check failed: %s", s.c_str());
+        return false;
+      }
+
+      bool coeff_ok = false;
+      for (int attempt = 0; attempt < 3; ++attempt) {
+        ser << "AT+COEFF?\r";
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        ser >> s;
+        RCLCPP_INFO(this->get_logger(), "AT+COEFF? response: %s", s.c_str());
+        if (s.find("+COEFF=") != std::string::npos && s.find("OK") != std::string::npos) {
+          coeff_ok = true;
+          break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      }
+
+      if (!coeff_ok) {
+        RCLCPP_WARN(this->get_logger(), "AT+COEFF? failed");
+        return false;
+      }
+
+      std::string json_data = s.substr(s.find("{"));
+      cJSON *cparms = cJSON_Parse(json_data.c_str());
+      uvf_parms[0] = cJSON_GetObjectItem(cparms, "fx")->valuedouble / 262144.0f;
+      uvf_parms[1] = cJSON_GetObjectItem(cparms, "fy")->valuedouble / 262144.0f;
+      uvf_parms[2] = cJSON_GetObjectItem(cparms, "u0")->valuedouble / 262144.0f;
+      uvf_parms[3] = cJSON_GetObjectItem(cparms, "v0")->valuedouble / 262144.0f;
+      cJSON_Delete(cparms);
+
+      ser << "AT+DISP=3\r";
+      ser >> s;
+      if (s.find("OK") == std::string::npos) {
+        RCLCPP_WARN(this->get_logger(), "AT+DISP=3 failed");
+        return false;
+      }
+
+      return true;
+    } catch (...) {
+      RCLCPP_ERROR(this->get_logger(), "Exception during sensor setup");
+      return false;
+    }
+  }
 
  public:
   SipeedTOF_MSA010_Publisher() : Node("sipeed_tof_ms_a010") {
@@ -34,8 +104,6 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
     pser = new Serial(s);
     std::cout << "use device: " << s << std::endl;
 
-    // -----
-    // Turn off ISP for raw data
     // ser << "AT+ISP=0\r";
     // do {
     //   ser >> s;
@@ -44,34 +112,7 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
     // std::cout << std::endl;
     // std::cout << "finish: " << "AT+ISP=0" << std::endl;
 
-    // // Set UNIT to 1 (millimeter quantization, 16-bit mode)
-    // ser << "AT+UNIT=1\r";
-    // do {
-    //   ser >> s;
-    //   std::cout << "AT+UNIT=1: get dummy: " << s.size() << "\r";
-    // } while(!s.empty());
-    // std::cout << std::endl;
-    // std::cout << "finish: " << "AT+UNIT=1" << std::endl;
-
-    // // Set full resolution (100x100)
-    // ser << "AT+BINN=1\r";
-    // do {
-    //   ser >> s;
-    //   std::cout << "AT+BINN=1: get dummy: " << s.size() << "\r";
-    // } while(!s.empty());
-    // std::cout << std::endl;
-    // std::cout << "finish: " << "AT+BINN=1" << std::endl;
-
-    // // Enable USB + UART output, disable LCD
-    // ser << "AT+DISP=6\r";
-    // do {
-    //   ser >> s;
-    //   std::cout << "AT+DISP=6: get dummy: " << s.size() << "\r";
-    // } while(!s.empty());
-    // std::cout << std::endl;
-    // std::cout << "finish: " << "AT+DISP=6" << std::endl;
-
-    //  ser << "AT+DISP=1\r";
+    // ser << "AT+DISP=1\r";
     // do {
     //   ser >> s;
     //   std::cout << "AT+DISP=1: get dummy: " << s.size() << "\r";
@@ -79,25 +120,14 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
     // std::cout << std::endl;
     // std::cout << "finish: " << "AT+DISP=1" << std::endl;
 
-    // // Set frame rate (e.g., 10 FPS)
-    // ser << "AT+FPS=10\r";
+    // ser << "AT+ISP=1\r";
     // do {
     //   ser >> s;
-    //   std::cout << "AT+FPS=10: get dummy: " << s.size() << "\r";
+    //   std::cout << "AT+ISP=1: get dummy: " << s.size() << "\r";
     // } while(!s.empty());
     // std::cout << std::endl;
-    // std::cout << "finish: " << "AT+FPS=10" << std::endl;
+    // std::cout << "finish: " << "AT+ISP=1 " << s << std::endl;
 
-    // // // Save configuration to flash
-    // // ser << "AT+SAVE\r";
-    // // do {
-    // //   ser >> s;
-    // //   std::cout << "AT+SAVE: get dummy: " << s.size() << "\r";
-    // // } while(!s.empty());
-    // // std::cout << std::endl;
-    // // std::cout << "finish: " << "AT+SAVE" << std::endl;
-
-    // // Check if serial port works
     // ser << "AT\r";
     // ser >> s;
     // std::cout << "finish: " << "AT " << s << std::endl;
@@ -105,88 +135,61 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
     //   // not this serial port
     //   return;
     // }
-    // -----
 
-    ser << "AT+ISP=0\r";
-    do {
-      ser >> s;
-      std::cout << "AT+ISP=0: get dummy: " << s.size() << "\r";
-    } while(!s.empty());
-    std::cout << std::endl;
-    std::cout << "finish: " << "AT+ISP=0" << std::endl;
+    // ser << "AT+COEFF?\r";
+    // ser >> s;
+    // std::cout << "finish: " << "AT+COEFF? " << s << std::endl;
+    // if (s.compare("+COEFF=1\r\nOK\r\n")) {
+    //   // not this serial port
+    //   std::cout << "AT+COEFF error" << std::endl;
+    //   return;
+    // }
 
-    // // Set UNIT to 1 (millimeter quantization, 16-bit mode)
-    // ser << "AT+UNIT=0\r";
-    // do {
+    // s = s.substr(14, s.length() - 14);
+    // std::cout << "s.substr" << std::endl;
+    // if (s.length() == 0) {
     //   ser >> s;
-    //   std::cout << "AT+UNIT=0: get dummy: " << s.size() << "\r";
-    // } while(!s.empty());
-    // std::cout << std::endl;
-    // std::cout << "finish: " << "AT+UNIT=0" << std::endl;
+    // }
+    // std::cout << "parse json" << std::endl;
+    // // cout << s << endl;
+    // cJSON *cparms = cJSON_ParseWithLength((const char *)s.c_str(), s.length());
+    // uint32_t tmp;
+    // uvf_parms[0] =
+    //     ((float)((cJSON_GetObjectItem(cparms, "fx")->valueint) / 262144.0f));
+    // uvf_parms[1] =
+    //     ((float)((cJSON_GetObjectItem(cparms, "fy")->valueint) / 262144.0f));
+    // uvf_parms[2] =
+    //     ((float)((cJSON_GetObjectItem(cparms, "u0")->valueint) / 262144.0f));
+    // uvf_parms[3] =
+    //     ((float)((cJSON_GetObjectItem(cparms, "v0")->valueint) / 262144.0f));
+    // std::cout << "fx: " << uvf_parms[0] << std::endl;
+    // std::cout << "fy: " << uvf_parms[1] << std::endl;
+    // std::cout << "u0: " << uvf_parms[2] << std::endl;
+    // std::cout << "v0: " << uvf_parms[3] << std::endl;
 
-    ser << "AT+DISP=1\r";
-    do {
-      ser >> s;
-      std::cout << "AT+DISP=1: get dummy: " << s.size() << "\r";
-    } while(!s.empty());
-    std::cout << std::endl;
-    std::cout << "finish: " << "AT+DISP=1" << std::endl;
+    // /* do not delete it. It is waiting */
+    // ser >> s;
 
-    ser << "AT+ISP=1\r";
-    do {
-      ser >> s;
-      std::cout << "AT+ISP=1: get dummy: " << s.size() << "\r";
-    } while(!s.empty());
-    std::cout << std::endl;
-    std::cout << "finish: " << "AT+ISP=1 " << s << std::endl;
+    // ser << "AT+DISP=3\r";
+    // ser >> s;
+    // if (s.compare("OK\r\n")) {
+    //   // not this serial port
+    //   return;
+    // }
 
-    ser << "AT\r";
-    ser >> s;
-    std::cout << "finish: " << "AT " << s << std::endl;
-    if (s.compare("OK\r\n")) {
-      // not this serial port
-      return;
+    bool success = false;
+    for (int attempt = 0; attempt < 7; ++attempt) {
+      RCLCPP_INFO(this->get_logger(), "Sensor setup attempt %d", attempt + 1);
+      if (setup_sensor()) {
+        success = true;
+        break;
+      }
+      rclcpp::sleep_for(1s);
     }
 
-    ser << "AT+COEFF?\r";
-    ser >> s;
-    std::cout << "finish: " << "AT+COEFF? " << s << std::endl;
-    if (s.compare("+COEFF=1\r\nOK\r\n")) {
-      // not this serial port
-      std::cout << "AT+COEFF error" << std::endl;
-      return;
-    }
-
-    s = s.substr(14, s.length() - 14);
-    std::cout << "s.substr" << std::endl;
-    if (s.length() == 0) {
-      ser >> s;
-    }
-    std::cout << "parse json" << std::endl;
-    // cout << s << endl;
-    cJSON *cparms = cJSON_ParseWithLength((const char *)s.c_str(), s.length());
-    uint32_t tmp;
-    uvf_parms[0] =
-        ((float)((cJSON_GetObjectItem(cparms, "fx")->valueint) / 262144.0f));
-    uvf_parms[1] =
-        ((float)((cJSON_GetObjectItem(cparms, "fy")->valueint) / 262144.0f));
-    uvf_parms[2] =
-        ((float)((cJSON_GetObjectItem(cparms, "u0")->valueint) / 262144.0f));
-    uvf_parms[3] =
-        ((float)((cJSON_GetObjectItem(cparms, "v0")->valueint) / 262144.0f));
-    std::cout << "fx: " << uvf_parms[0] << std::endl;
-    std::cout << "fy: " << uvf_parms[1] << std::endl;
-    std::cout << "u0: " << uvf_parms[2] << std::endl;
-    std::cout << "v0: " << uvf_parms[3] << std::endl;
-
-    /* do not delete it. It is waiting */
-    ser >> s;
-
-    ser << "AT+DISP=3\r";
-    ser >> s;
-    if (s.compare("OK\r\n")) {
-      // not this serial port
-      return;
+    if (!success) {
+      RCLCPP_FATAL(this->get_logger(), "Failed to initialize sensor after retries");
+      throw std::runtime_error("Sensor init failed");
     }
 
     publisher_depth =
