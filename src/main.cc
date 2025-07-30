@@ -58,7 +58,7 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
       bool coeff_ok = false;
       for (int attempt = 0; attempt < 3; ++attempt) {
         ser << "AT+COEFF?\r";
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
         ser >> s;
         RCLCPP_INFO(this->get_logger(), "AT+COEFF? response: %s", s.c_str());
         if (s.find("+COEFF=") != std::string::npos && s.find("OK") != std::string::npos) {
@@ -295,8 +295,9 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
         
         float cx = (((float)i) - u0) / fox;
         float cy = (((float)j) - v0) / foy;
-        float dst = ((float)depth[j * (pcmsg.width) + i]) ; // was / 1000 in the last part
-        dst = std::pow(dst / 5.1f, 2.0f)/ 1000 ; // compensate for the non-linear depth
+        float dst = ((float)depth[j * (pcmsg.width) + i]); // was / 1000 in the last part
+        dst = std::pow(dst / 5.1f, 2.0f);
+        dst = (dst + 11.6f) / 1000.0f; // the offset coming from calibration is 1.16 cm
         float x = dst * cx;
         float y = dst * cy;
         float z = dst;
