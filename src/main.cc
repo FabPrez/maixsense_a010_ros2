@@ -178,7 +178,7 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
     // }
 
     bool success = false;
-    for (int attempt = 0; attempt < 7; ++attempt) {
+    for (int attempt = 0; attempt < 10; ++attempt) {
       RCLCPP_INFO(this->get_logger(), "Sensor setup attempt %d", attempt + 1);
       if (setup_sensor()) {
         success = true;
@@ -296,11 +296,13 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
         float cx = (((float)i) - u0) / fox;
         float cy = (((float)j) - v0) / foy;
         float dst = ((float)depth[j * (pcmsg.width) + i]); // was / 1000 in the last part
-        dst = std::pow(dst / 5.1f, 2.0f);
-        dst = (dst + 11.6f) / 1000.0f; // the offset coming from calibration is 1.16 cm
-        float x = dst * cx;
-        float y = dst * cy;
-        float z = dst;
+        dst = std::pow(dst / 5.1f, 2.0f) / 1000.0f;
+        float offset_x = 0.0375;    // offset_x = +3,75 cm
+        float offset_y = 0.0100;    // offset_y = +1,00 cm
+        float offset_z = 0.0116;    // offset_z = +1,16 cm
+        float x = dst * cx + offset_x;
+        float y = dst * cy + offset_y;   
+        float z = dst + offset_z;
 
         *((float *)(ptr + 0)) = x;
         *((float *)(ptr + 4)) = y;
