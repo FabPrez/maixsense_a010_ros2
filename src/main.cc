@@ -297,9 +297,9 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
         float cy = (((float)j) - v0) / foy;
         float dst = ((float)depth[j * (pcmsg.width) + i]); // was / 1000 in the last part
         dst = std::pow(dst / 5.1f, 2.0f) / 1000.0f;
-        float offset_x = 0.0375;    // offset_x = +3,75 cm
-        float offset_y = 0.0100;    // offset_y = +1,00 cm
-        float offset_z = 0.0116;    // offset_z = +1,16 cm
+        float offset_x = 0.0050;
+        float offset_y = 0.0250;
+        float offset_z = 0.0116;
         float x = dst * cx + offset_x;
         float y = dst * cy + offset_y;   
         float z = dst + offset_z;
