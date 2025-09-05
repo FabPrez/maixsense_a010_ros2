@@ -42,6 +42,9 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
       ser << "AT+ISP=0\r";
       do { ser >> s; } while (!s.empty());
 
+      ser << "AT+UNIT=3\r";
+      do { ser >> s; } while (!s.empty());
+
       ser << "AT+DISP=1\r";
       do { ser >> s; } while (!s.empty());
 
@@ -266,10 +269,10 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
     pcmsg.fields[3].datatype = sensor_msgs::msg::PointField::UINT32;
     pcmsg.fields[3].count = 1;
 
-    float fox = uvf_parms[0];
-    float foy = uvf_parms[1];
-    float u0 = uvf_parms[2];
-    float v0 = uvf_parms[3];
+    float fx = uvf_parms[0];
+    float fy = uvf_parms[1];
+    float u0 = uvf_parms[2]; // centro ottico x
+    float v0 = uvf_parms[3]; // centro ottico y
 
     pcmsg.data.resize((pcmsg.height) * (pcmsg.width) * (pcmsg.point_step),
                       0x00);
@@ -293,16 +296,25 @@ class SipeedTOF_MSA010_Publisher : public rclcpp::Node {
         // this means that we can measure up to 2.5 m but the resolution is not linear and will get worse with distance
         // in lower distance we get a good resolution.
         
-        float cx = (((float)i) - u0) / fox;
-        float cy = (((float)j) - v0) / foy;
+        float u_norm = (((float)i) - u0) / fx;
+        float v_norm = (((float)j) - v0) / fy;
         float dst = ((float)depth[j * (pcmsg.width) + i]); // was / 1000 in the last part
-        dst = std::pow(dst / 5.1f, 2.0f) / 1000.0f;
-        float offset_x = 0.0050;
-        float offset_y = 0.0250;
-        float offset_z = 0.0116;
-        float x = dst * cx + offset_x;
-        float y = dst * cy + offset_y;   
-        float z = dst + offset_z;
+
+        //! dst QUANTIZZAZIONE NON LINEARE 5.1*sqrt(x) (AT+UNIT = 0)
+        // dst = std::pow(dst / 5.1f, 2.0f) / 1000.0f;
+        // float offset_x = 0.0050;
+        // float offset_y = 0.0250;
+        // float offset_z = 0.0116;
+        // float x = dst * u_norm + offset_x;
+        // float y = dst * v_norm + offset_y;   
+        // float z = dst + offset_z;
+
+        //! dst QUANTIZZAZIONE LINEARE (AT+UNIT = 3)
+        dst = dst * 3.0f / 1000.0f;
+        dst = dst + 0.017; // 1.7cm di offset per piano (5cm contati dai voxel - 3.3cm differenza tra reale con metro e misura da /calibrate_plane)
+        float x = dst * u_norm;
+        float y = dst * v_norm;   
+        float z = dst;
 
         *((float *)(ptr + 0)) = x;
         *((float *)(ptr + 4)) = y;
